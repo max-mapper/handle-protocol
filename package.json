@@ -1,20 +1,27 @@
 {
   "name": "handle-protocol",
   "version": "1.0.0",
-  "description": "",
+  "description": "JavaScript implementation of the Handle Protocol (rfc 3652), the protocol used by Digital Object Identifiers (DOI)",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/maxogden/handle-protocol.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["DOI", "handle", "DOIs", "crossref", "datacite", "citation"],
+  "author": "max ogden",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/maxogden/handle-protocol/issues"
   },
-  "homepage": "https://github.com/maxogden/handle-protocol#readme"
+  "homepage": "https://github.com/maxogden/handle-protocol#readme",
+  "dependencies": {
+    "concat-stream": "^1.6.0",
+    "debug": "^2.6.8"
+  },
+  "devDependencies": {
+    "tape": "^4.7.0"
+  }
 }
