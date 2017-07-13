@@ -85,27 +85,23 @@ function lookup (handle, options, cb) {
     options = {}
   }
   debug('lookup', handle, options)
-  var majorVersion = 2
-  var minorVersion = 1
+  var empty32 = new Buffer([0, 0, 0, 0])
+  var empty16 = new Buffer([0, 0])
+  var majorVersion = new Buffer([2])
+  var minorVersion = new Buffer([1])
   var digestAlg = 2 // SHA1 = 2, MD5 = 1
   var digestLength = 20 // SHA1 = 20 octets, MD5 = 16
-  var sequenceNumber = [0, 0, 0, 0]
-  var indexList = [0, 0, 0, 0] // return all indices
-  var typeList = [0, 0, 0, 0] // return all types
-  var messageFlag = [0, 0]
-  var opFlag = [0, 0, 0, 0]
-  var sessionId = [0, 0, 0, 0]
-  var siteInfoSerial = [0xff, 0xff]
-  var recursionCount = [0]
+  var sequenceNumber = empty32
+  var indexList = empty32 // return all indices
+  var typeList = empty32 // return all types
+  var messageFlag = empty16
+  var opFlag = empty32
+  var sessionId = empty32
+  var siteInfoSerial = new Buffer([0xff, 0xff])
+  var recursionCount = new Buffer([0])
   var requestId = ~~(Date.now() / 1000)
   var expirationTime = requestId + 600 // 10 mins
-  var credentialVersion = []
-  var credentialReserved = []
-  var credentialOptions = []
-  var credentialSigner = []
-  var credentialType = []
-  var credentialDigestAlg = []
-  var opCode = asBytes(OC_RESOLUTION)
+  var opCode = as32Bit(options.opCode || OC_RESOLUTION)
   var responseCode = 0
   var authoritative = false
   var returnRequestDigest = false
@@ -117,44 +113,43 @@ function lookup (handle, options, cb) {
   var continuous = false
   var keepAlive = false
 
-  var body = toProtocolString(handle)
-  body = body.concat(indexList)
-  body = body.concat(typeList)
+  var body = options.body
+  if (!body) {
+    body = [asUTF8String(handle)]
+    body = body.concat(indexList)
+    body = body.concat(typeList)
+    body = Buffer.concat(body)
+  }
 
   var header = [].concat(opCode)
-  header = header.concat(asBytes(responseCode))
+  header = header.concat(as32Bit(responseCode))
   header = header.concat(opFlag)
   header = header.concat(siteInfoSerial)
   header = header.concat(recursionCount)
-  header = header.concat([0])
-  header = header.concat(asBytes(expirationTime))
-  header = header.concat(asBytes(body.length))
+  header = header.concat(new Buffer([0]))
+  header = header.concat(as32Bit(expirationTime))
+  header = header.concat(as32Bit(body.length))
+  header = Buffer.concat(header)
 
-  var credential = []
-  credential = credential.concat(credentialVersion)
-  credential = credential.concat(credentialReserved)
-  credential = credential.concat(credentialOptions)
-  credential = credential.concat(credentialSigner)
-  credential = credential.concat(credentialType)
-  credential = asBytes(credential.length).concat(credential)
+  var credential = as32Bit(0)
 
   var envelope = [
     majorVersion, minorVersion
   ]
   envelope = envelope.concat(messageFlag)
   envelope = envelope.concat(sessionId)
-  envelope = envelope.concat(asBytes(requestId))
+  envelope = envelope.concat(as32Bit(requestId))
   envelope = envelope.concat(sequenceNumber)
-  envelope = envelope.concat(asBytes(body.length + 24 + credential.length))
+  envelope = envelope.concat(as32Bit(body.length + 24 + credential.length))
+  envelope = Buffer.concat(envelope)
 
   var packet = [].concat(envelope)
   packet = packet.concat(header)
   packet = packet.concat(body)
   packet = packet.concat(credential)
+  packet = Buffer.concat(packet)
 
   debug('env', envelope.length, 'header', header.length, 'body', body.length, 'creds', credential.length, 'packet', packet.length)
-
-  packet = new Buffer(packet)
 
   var GHRs = [ // from root_info.c
     '132.151.20.9', // Root Mirror #3 at CNRI
@@ -182,7 +177,7 @@ function lookup (handle, options, cb) {
       }
       var respLen = body.body.slice(0, 4).readUInt32BE()
       var respBody
-      if (respLen) respBody = body.body.slice(4, respLen).toString()
+      if (respLen) respBody = body.body.slice(4, 4 + respLen).toString()
       cb(new Error('Response Error' + (respBody ? ': ' + respBody : '')), header)
     }))
   })
@@ -359,20 +354,17 @@ function lookup (handle, options, cb) {
     return offset
   }
 
-  function toProtocolString (buf) {
+  function asUTF8String (buf) {
     if (!Buffer.isBuffer(buf)) buf = new Buffer(buf)
-    var dataBytes = JSON.parse('[' + buf.join(',') + ']') // simulate ruby pack("C*")
-    var len = dataBytes.length
-    var result = asBytes(len)
-    return result.concat(dataBytes)
+    var lenBuf = as32Bit(buf.length)
+    return Buffer.concat([lenBuf, buf])
   }
 
-  function asBytes (val) {
-    var i = new Buffer(4)
-    debug('asBytes', val)
-    i.writeUInt32BE(val, 0)
-    var bytes = JSON.parse('[' + i.join(',') + ']')
-    return bytes
+  function as32Bit (val) {
+    var buf = new Buffer([0, 0, 0, 0])
+    debug('as32Bit', val)
+    buf.writeUInt32BE(val, 0)
+    return buf
   }
 }
 
