@@ -7,6 +7,7 @@ var net = require('net')
 var crypto = require('crypto')
 var concat = require('concat-stream')
 var debug = require('debug')('handle-protocol')
+var cached = {}
 
 function resolve (handle, cb) {
   var ONA = "0.NA/" + handle.split('/')[0]
@@ -25,6 +26,9 @@ function resolve (handle, cb) {
           lookup(handle, {host: addr}, cb)
         })
       })
+    } else {
+      var addr = getPrimaryAddr(handle, data) 
+      lookup(handle, {host: addr}, cb)
     }
   })
   
@@ -78,13 +82,34 @@ function resolve (handle, cb) {
   }
 }
 
-
 function lookup (handle, options, cb) {
   if (typeof options === 'function') {
     cb = options
     options = {}
   }
   debug('lookup', handle, options)
+
+  var GHRs = [ // from root_info.c
+    '132.151.20.9', // Root Mirror #3 at CNRI
+    '38.100.138.131', // root primary
+    '63.123.152.246', // crossref global mirror
+    '132.151.1.179' // east coast root mirror
+  ]
+
+  var HOST = options.host || GHRs[2]
+  var PORT = options.port || 2641
+  
+  var shouldCache = false
+  if (handle.slice(0, 4) === '0.NA') shouldCache = true
+  else if (handle.slice(0, 7) === '10.SERV') shouldCache = true
+  if (shouldCache) {
+    var result
+    if (cached[HOST]) result = cached[HOST][handle]
+    if (result) return process.nextTick(function () {
+      debug('using cached response for', handle)
+      cb(null, result.header, result.data)
+    })
+  }
   var empty32 = new Buffer([0, 0, 0, 0])
   var empty16 = new Buffer([0, 0])
   var majorVersion = new Buffer([2])
@@ -151,16 +176,6 @@ function lookup (handle, options, cb) {
 
   debug('env', envelope.length, 'header', header.length, 'body', body.length, 'creds', credential.length, 'packet', packet.length)
 
-  var GHRs = [ // from root_info.c
-    '132.151.20.9', // Root Mirror #3 at CNRI
-    '38.100.138.131', // root primary
-    '63.123.152.246', // crossref global mirror
-    '132.151.1.179' // east coast root mirror
-  ]
-
-  var HOST = options.host || GHRs[2]
-  var PORT = options.port || 2641
-
   var socket = net.connect(PORT, HOST)
   socket.on('connect', function () {
     debug('tcp socket connected', HOST, PORT)
@@ -173,6 +188,10 @@ function lookup (handle, options, cb) {
       // TODO var credential = parseCredential()
       if (header.responseCode === 1) {
         var values = parseValues(body.body)
+        if (shouldCache) {
+          if (!cached[HOST]) cached[HOST] = {}
+          cached[HOST][handle] = {header: header, data: values.values}
+        }
         return cb(null, header, values.values)
       }
       var respLen = body.body.slice(0, 4).readUInt32BE()
