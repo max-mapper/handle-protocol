@@ -1,6 +1,6 @@
 {
   "name": "handle-protocol",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "JavaScript implementation of the Handle Protocol (rfc 3652), the protocol used by Digital Object Identifiers (DOI)",
   "main": "index.js",
   "scripts": {
