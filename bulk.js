@@ -18,7 +18,7 @@ function bulk () {
 function getDOI (item, cb) {
   try {
     Handle(item.doi, function (err, headers, data) {
-      if (err) error(err)
+      if (err) return error(err)
       cb(null, {headers: headers, data: data})
     })
   } catch (e) {
